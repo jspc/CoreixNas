@@ -42,6 +42,7 @@ sub errors {
   # Return a list of error statuses
   return {
 	  250 => "Cowardly refusing to overwrite image\n",
+	  251 => "The mountpoint exists, probably worth checking\n",
 	 };
 }
 
@@ -90,7 +91,7 @@ sub create_volume {
   # Create the image, create the mountpoint and create the FS
 
   my $image = "$self->{base}\/$self->{imgs}\/$customer";
-
+  my $mount = "$self->{base}\/$customer";
 
   my @dd_args = ("if=/dev/zero", "of=$image", "bs=1M", "count=$size");
   
@@ -108,6 +109,13 @@ sub create_volume {
   my @fs_args = ("-t", "$fs", "$device");
   systemx( "/sbin/mkfs", @fs_args );
 
+
+  if ( -d $mount ) {
+    # Mountpoint exists
+    return 251;
+  }
+  mkdir $mount;
+
   
   # Add the image to fstab and update our list of loopback devices
   # This means when we start the service we can keep the same devices
@@ -116,11 +124,34 @@ sub create_volume {
   $self->_update_loops( $device, $image );
   
   open(FSTAB, ">>/etc/fstab");
-  print FSTAB "$device\t$image\t$fs\tdefaults\t0\t0";
+  print FSTAB "$device\t$mount\t$fs\tdefaults\t0\t0\n";
   close FSTAB;
 
+  # Because this is in fstab we should be able to just do a straight mount
   systemx( "/bin/mount", $device );
+
+  return 1;
   
+}
+
+
+sub delete_volume {
+  # Delete a volume for good; unmount, destroy the mountpoint
+  # Remove from loops and so on. For now just unlink the image
+  # At a later date I intend to add to a job list to shred the data
+
+  my $self = shift;
+  my $customer = shift;
+
+  # Suss out image and mountpoint
+  my $mount = "$self->{base}\/$customer";
+  my $image = "$self->{base}\/$self->{imgs}\/$customer";
+  my $loop = $self->{loop}->{image};
+
+  my @umount_args = ( "-f", $loop );
+  systemx( "/bin/umount", @umount_args );
+  
+
 }
 
 
@@ -144,13 +175,15 @@ sub _get_loops {
 sub _update_loops {
   # Update the loopback device file
   # &_update_loops /dev/loop0 /path/to/image
+  # Saved as per $path => $loop for ease when
+  # Updating and creating; where we'd need to umount
 
   my $self = shift;
   my $loop = shift;
   my $path = shift;
 
   my $loops = $self->{loops};
-  $loops->{$loop} = $path;
+  $loops->{$path} = $loop;
 
   store $loops, "$self->{base}/internal/.loops";
   
