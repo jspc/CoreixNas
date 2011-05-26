@@ -1,0 +1,9 @@
+This directory will store our prototypes for FS specific tasks.
+This will promote standardisation and ensure features work identically across the board.
+
+There are a couple of important methods to take into account here:
+
+grow_fs( image_file, device, new_size )
+shrink_fs( image_file, device, new_size )
+
+Others methods may be created as internals, but will never be called anywhere else

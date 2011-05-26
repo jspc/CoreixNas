@@ -22,6 +22,7 @@ use Poultry::Disk::XFS;
 
 use IPC::System::Simple qw(capturex systemx);
 use Storable;
+use Switch;
 
 sub new {
   # Constructor
@@ -48,6 +49,8 @@ sub errors {
   return {
 	  250 => "Cowardly refusing to overwrite image\n",
 	  251 => "The mountpoint exists, probably worth checking\n",
+	  252 => "Filesystem type not yet supported\n",
+	  253 => "You can't resize to exactly the same size\n",
 	 };
 }
 
@@ -156,6 +159,64 @@ sub delete_volume {
 
   unlink $image;
   rmdir $mount;
+
+}
+
+sub resize_volume {
+  # Resize a volume to add space. This stuff is handled by
+  # Modules in Poultry::Disk::*.pm
+  # Shares a lot of code with delete_volume() but I'm not sure it
+  # is appropriate to have a joint subroutine to do these bits
+
+  my $self = shift;
+  my $customer = shift;
+  my $new_size = shift;
+
+  my $mount = "$self->{base}\/$customer";
+  my $image = "$self->{base}\/$self->{imgs}\/$customer";
+  my $loop = $self->{loops}->{$image};
+
+  # Get fs type, unmount and find correct handler
+
+  open(MTAB, "/etc/mtab");
+  while my $line ( <MTAB> ){
+    last if $line =~ /$loop/;
+  }
+  close MTAB;
+
+  
+  my @mtab_line = split / */, $line;
+  my $fs = $mtab_line[2];
+
+  my @umount_args = ( "-f", $loop );
+  systemx( "/bin/umount", @umount_args );
+
+  my $handler;
+
+  switch( $fs ) {
+    case "ext3" { $handler = Poultry::Disk::Ext3->new() }
+    else        { return 252 }
+  }
+  
+  # Compare current size so we know whether or not we're growing
+  # or Shrinking
+
+  my @du_args = ("-B", "1M", "$image");
+  my $du = capturex( "/usr/bin/du", @du_args );
+  my @du_res = split / */, $du;
+  $du = $du_res[0];
+
+  if ( $new_size > $du_res ){
+    # Grow
+    $handler->grow( $image, $loop, $new_size );
+  } elsif ( $new_size < $du_res ){
+    # Shrink
+    $handler->shrink( $image, $loop, $new_size );
+  } else {
+    return 253;
+  }
+
+  return 1;
 
 }
 
