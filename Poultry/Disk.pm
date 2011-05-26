@@ -117,8 +117,11 @@ sub create_volume {
   mkdir $mount;
 
   
-  # Mount the device. @fs_args is perfect for this; reuse
-  systemx( "/bin/mount", @fs_args );
+  # Mount the device.
+  my @mount_args = ("-t", "$fs", "$device", "$mount");
+  systemx( "/bin/mount", @mount_args );
+
+  $self->_update_loops( $device, $image );
 
   return 1;
   
