@@ -52,6 +52,8 @@ sub errors {
 	  251 => "The mountpoint exists, probably worth checking\n",
 	  252 => "Filesystem type not yet supported\n",
 	  253 => "You can't resize to exactly the same size\n",
+	  254 => "\n", # Undefined as of yet
+	  255 => "Filesystem too small for existing data\n",
 	 };
 }
 
@@ -195,9 +197,6 @@ sub resize_volume {
   my @mtab_line = split ' ', $line;
   my $fs = $mtab_line[2];
 
-  my @umount_args = ( "-f", $loop );
-  systemx( "/bin/umount", @umount_args );
-
   my $handler;
 
   switch( $fs ) {
@@ -215,10 +214,10 @@ sub resize_volume {
 
   if ( $new_size > $du ){
     # Grow
-    $handler->grow( $image, $loop, $new_size );
+    return $handler->grow( $image, $loop, $new_size, $mount );
   } elsif ( $new_size < $du ){
     # Shrink
-    $handler->shrink( $image, $loop, $new_size );
+    return $handler->shrink( $image, $loop, $new_size, $mount );
   } else {
     return 253;
   }
