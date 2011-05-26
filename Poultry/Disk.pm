@@ -117,18 +117,8 @@ sub create_volume {
   mkdir $mount;
 
   
-  # Add the image to fstab and update our list of loopback devices
-  # This means when we start the service we can keep the same devices
-  # Which will be perfect for fstab and so on
-
-  $self->_update_loops( $device, $image );
-  
-  open(FSTAB, ">>/etc/fstab");
-  print FSTAB "$device\t$mount\t$fs\tdefaults\t0\t0\n";
-  close FSTAB;
-
-  # Because this is in fstab we should be able to just do a straight mount
-  systemx( "/bin/mount", $device );
+  # Mount the device. @fs_args is perfect for this; reuse
+  systemx( "/bin/mount", @fs_args );
 
   return 1;
   
@@ -158,22 +148,6 @@ sub delete_volume {
 
   unlink $image;
   rmdir $mount;
-
-  my @fstab_in;
-  my @fstab_out;
-  
-  open ( FSTAB_i, "/etc/fstab" );
-  @fstab_in = <FSTAB_i>;
-  close FSTAB_i;
-
-  @fstab_out = grep ! /^$loop/, @fstab_in;
-
-  open ( FSTAB_o, ">/etc/fstab" );
-  print FSTAB_o @fstab_out;
-  close FSTAB_o;
-
-
-  return 1;
 
 }
 
