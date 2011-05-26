@@ -17,8 +17,10 @@ use warnings;
 package Poultry::Disk;
 
 use Poultry::Disk::Ext3;
-use Poultry::Disk::Ext4;
-use Poultry::Disk::XFS;
+
+# For example....
+#use Poultry::Disk::Ext4;
+#use Poultry::Disk::XFS;
 
 use IPC::System::Simple qw(capturex systemx);
 use Storable;
@@ -41,7 +43,6 @@ sub new {
   $self->_start_devices();
 
   return $self;
-
 }
 
 sub errors {
@@ -147,7 +148,7 @@ sub delete_volume {
   # Suss out image and mountpoint
   my $mount = "$self->{base}\/$customer";
   my $image = "$self->{base}\/$self->{imgs}\/$customer";
-  my $loop = $self->{loops}->{$image};
+  my $loop = $self->{loops}->{$customer};
 
   $self->_remove_loops( $customer );
 
@@ -172,20 +173,26 @@ sub resize_volume {
   my $customer = shift;
   my $new_size = shift;
 
-  my $mount = "$self->{base}\/$customer";
-  my $image = "$self->{base}\/$self->{imgs}\/$customer";
-  my $loop = $self->{loops}->{$image};
+  my $mount = "$self->{base}/$customer";
+  my $image = "$self->{base}/$self->{imgs}/$customer";
+  my $loop = $self->{loops}->{$customer};
+
+  print "We have $customer data in $image which is mounted on $loop\n";
 
   # Get fs type, unmount and find correct handler
 
+  my $line;
+
   open(MTAB, "/etc/mtab");
-  while my $line ( <MTAB> ){
-    last if $line =~ /$loop/;
+  foreach ( <MTAB> ){
+      if (  $_ =~ /$loop/ ){
+	  $line = $_;
+	  last;
+      }
   }
   close MTAB;
-
   
-  my @mtab_line = split / */, $line;
+  my @mtab_line = split ' ', $line;
   my $fs = $mtab_line[2];
 
   my @umount_args = ( "-f", $loop );
@@ -203,18 +210,24 @@ sub resize_volume {
 
   my @du_args = ("-B", "1M", "$image");
   my $du = capturex( "/usr/bin/du", @du_args );
-  my @du_res = split / */, $du;
+  my @du_res = split ' ', $du;
   $du = $du_res[0];
 
-  if ( $new_size > $du_res ){
+  if ( $new_size > $du ){
     # Grow
     $handler->grow( $image, $loop, $new_size );
-  } elsif ( $new_size < $du_res ){
+  } elsif ( $new_size < $du ){
     # Shrink
     $handler->shrink( $image, $loop, $new_size );
   } else {
     return 253;
   }
+
+
+  # Remount the filesystem
+
+  my @mount_args = ("$loop", "$mount");
+  systemx( "/bin/mount", @mount_args );
 
   return 1;
 
@@ -230,13 +243,12 @@ sub _start_devices {
   my $self = shift;
   my $loops = $self->{loops};
   
-  my ( $cust, $loop );
   my ( @loop_args, @mount_args );
 
-  while ( $cust, $loop = each %$loops ) {
+  while ( my ($cust, $loop) = each %$loops ) {
     # Attach the file to the loopback
     # Mount the loopback
-    
+
     @loop_args = ("$loop", "$self->{base}/$self->{imgs}/$cust");
     systemx( "losetup", @loop_args );
 

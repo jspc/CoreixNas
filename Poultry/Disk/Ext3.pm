@@ -37,17 +37,18 @@ sub grow {
   my @du_m_args = ("-B", "1M", "$image");
   my $old_size = capturex( "/usr/bin/du", @du_m_args );
   
-  my @old_size_arr = split / */, $old_size;
+  my @old_size_arr = split ' ', $old_size;
   my $skip_size = $old_size_arr[0] + 1;
-  my $new_size = $new_size - $old_size_arr[0];
+  $new_size = $new_size - $old_size_arr[0];
 
   my @dd_args = ("if=/dev/zero", "of=$image", "bs=1M", "count=$new_size", "seek=$skip_size");
   systemx( "/bin/dd", @dd_args );
 
   # Remove the Journaling, extend the filesystem and add it back
 
-  my $current_size = capturex( "du", $image );
-  my @current_size_arr = split / */, $current_size;
+  my @current_args = ("-B", "1M", "$image"); 
+  my $current_size = capturex( "du", @current_args );
+  my @current_size_arr = split ' ', $current_size;
   $current_size = $current_size_arr[0];
 
   my @tune_e2 = ("-O", "^has_journal", "$device");
@@ -62,7 +63,10 @@ sub grow {
   my @fsck_args = ("-f", "$device");
   systemx( "/sbin/e2fsck", @fsck_args );
 
-  my @resize_args = ("$device", "$current_size");
+  # Fix strange behaviour
+  my $resize = $current_size - 2;
+
+  my @resize_args = ("$device", $resize . "M");
   systemx( "/sbin/resize2fs", @resize_args );
 
   my @tune_e3 = ("-j", "$device");
