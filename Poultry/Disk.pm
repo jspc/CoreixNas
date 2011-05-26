@@ -150,7 +150,25 @@ sub delete_volume {
 
   my @umount_args = ( "-f", $loop );
   systemx( "/bin/umount", @umount_args );
+
+  my @loop_args = ( "-d", $loop );
+  systemx( "losetup", @loop_args );
+
+  unlink $image;
+  rmdir $mount;
+
+  my @fstab_in;
+  my @fstab_out;
   
+  open ( FSTAB_i, "/etc/fstab" );
+  @fstab_in = <FSTAB_i>;
+  close FSTAB_i;
+
+  @fstab_out = grep !/^\$loop/, @fstab_in;
+
+  open ( FSTAB_o, "/etc/fstab_pretend" );
+  print FSTAB_o @fstab_out;
+  close FSTAB_o;
 
 }
 
