@@ -170,6 +170,10 @@ sub delete_volume {
   print FSTAB_o @fstab_out;
   close FSTAB_o;
 
+  $self->_remove_loops( $image );
+
+  return 1;
+
 }
 
 
@@ -208,6 +212,25 @@ sub _update_loops {
   $self->{loops} = $self->_get_loops();
 
   return 1;
+}
+
+sub _remove_loop {
+    # Two subroutines; this one isn't called much so 
+    # No point bogging down _update_loops. Named as per
+    # This (for now) because I forgot I'd probably need this.
+    # D'oh
+
+    my $self = shift;
+    my $path = shift;
+
+    my $loops = $self->{loops};
+    delete $loops->{$path};
+
+    store $loops, "$self->{base}/internal/.loops";
+
+    $self->{loops} = $self->_get_loops();
+
+    return 1;
 }
 
 
