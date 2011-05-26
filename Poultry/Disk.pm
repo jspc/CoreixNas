@@ -27,12 +27,12 @@ sub new {
   my $imgs = shift;
 
   $self = bless {
-		 base => $base,
-		 imgs => $imgs,
-		 loop => "",
+		 base  =>  $base,
+		 imgs  =>  $imgs,
+		 loops =>  "",
 		};
 
-  $self->{loop} = $self->_get_loops();
+  $self->{loops} = $self->_get_loops();
 
   return $self;
 
@@ -146,7 +146,9 @@ sub delete_volume {
   # Suss out image and mountpoint
   my $mount = "$self->{base}\/$customer";
   my $image = "$self->{base}\/$self->{imgs}\/$customer";
-  my $loop = $self->{loop}->{image};
+  my $loop = $self->{loops}->{$image};
+
+  $self->_remove_loops( $image );
 
   my @umount_args = ( "-f", $loop );
   systemx( "/bin/umount", @umount_args );
@@ -164,13 +166,12 @@ sub delete_volume {
   @fstab_in = <FSTAB_i>;
   close FSTAB_i;
 
-  @fstab_out = grep !/^\$loop/, @fstab_in;
+  @fstab_out = grep ! /^$loop/, @fstab_in;
 
-  open ( FSTAB_o, "/etc/fstab_pretend" );
+  open ( FSTAB_o, ">/etc/fstab" );
   print FSTAB_o @fstab_out;
   close FSTAB_o;
 
-  $self->_remove_loops( $image );
 
   return 1;
 
@@ -214,7 +215,7 @@ sub _update_loops {
   return 1;
 }
 
-sub _remove_loop {
+sub _remove_loops {
     # Two subroutines; this one isn't called much so 
     # No point bogging down _update_loops. Named as per
     # This (for now) because I forgot I'd probably need this.
