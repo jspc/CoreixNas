@@ -16,6 +16,10 @@ use warnings;
 
 package Poultry::Disk;
 
+use Poultry::Disk::Ext3;
+use Poultry::Disk::Ext4;
+use Poultry::Disk::XFS;
+
 use IPC::System::Simple qw(capturex systemx);
 use Storable;
 
@@ -33,6 +37,7 @@ sub new {
 		};
 
   $self->{loops} = $self->_get_loops();
+  $self->_start_devices();
 
   return $self;
 
@@ -121,7 +126,7 @@ sub create_volume {
   my @mount_args = ("-t", "$fs", "$device", "$mount");
   systemx( "/bin/mount", @mount_args );
 
-  $self->_update_loops( $device, $image );
+  $self->_update_loops( $device, $customer );
 
   return 1;
   
@@ -141,7 +146,7 @@ sub delete_volume {
   my $image = "$self->{base}\/$self->{imgs}\/$customer";
   my $loop = $self->{loops}->{$image};
 
-  $self->_remove_loops( $image );
+  $self->_remove_loops( $customer );
 
   my @umount_args = ( "-f", $loop );
   systemx( "/bin/umount", @umount_args );
@@ -152,6 +157,34 @@ sub delete_volume {
   unlink $image;
   rmdir $mount;
 
+}
+
+
+# INTERNAL SUBROUTINES
+
+sub _start_devices {
+  # Take everything in our loopback hashref
+  # Attach them to the right device and return
+
+  my $self = shift;
+  my $loops = $self->{loops};
+  
+  my ( $cust, $loop );
+  my ( @loop_args, @mount_args );
+
+  while ( $cust, $loop = each %$loops ) {
+    # Attach the file to the loopback
+    # Mount the loopback
+    
+    @loop_args = ("$loop", "$self->{base}/$self->{imgs}/$cust");
+    systemx( "losetup", @loop_args );
+
+    @mount_args = ("$loop", "$self->{base}/$cust");
+    systemx( "mount", @mount_args );
+    
+  }
+  
+  return 1;
 }
 
 
@@ -174,16 +207,16 @@ sub _get_loops {
 
 sub _update_loops {
   # Update the loopback device file
-  # &_update_loops /dev/loop0 /path/to/image
+  # &_update_loops /dev/loop0 CNxxxx
   # Saved as per $path => $loop for ease when
   # Updating and creating; where we'd need to umount
 
   my $self = shift;
   my $loop = shift;
-  my $path = shift;
+  my $cust = shift;
 
   my $loops = $self->{loops};
-  $loops->{$path} = $loop;
+  $loops->{$cust} = $loop;
 
   store $loops, "$self->{base}/internal/.loops";
   
