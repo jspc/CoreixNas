@@ -96,9 +96,9 @@ sub shrink {
 
   my @df_args = ("-B", "1M", "$device");
   my $df = capturex( "/bin/df", @df_args );
-  my @df_arr = split /\/n/, $df;
-  @df_arr = split ' ', $df_arr[1];
-  my $used = $df_arr[2];
+  my @df_arr = split ' ', $df;
+
+  my $used = $df_arr[9];
 
   if ( ($used + 10) >= $new_size ){
     return 255;
@@ -115,7 +115,7 @@ sub shrink {
   my @fsck_args = ("-f", "$device");
   systemx( "/sbin/e2fsck", @fsck_args );
 
-  my @resize_args = ("$device", $size . "M");
+  my @resize_args = ("$device", $new_size . "M");
   systemx( "/sbin/resize2fs", @resize_args );
 
   my @mount_args = ("$device", "$mount_point");
@@ -125,9 +125,9 @@ sub shrink {
   # Get the right size of the FS for the resizing
 
   $df = capturex( "/bin/df", @df_args );
-  @df_arr = split /\/n/, $df;
-  @df_arr = split ' ', $df_arr[1];
-  my $size = $df_arr[1];
+
+  @df_arr = split ' ', $df;
+  my $size = $df_arr[8];
   $size = $size + 1;         # Paranoia
 
   systemx( "/bin/umount", @umount_args );
@@ -135,7 +135,7 @@ sub shrink {
   # Start resizing
   my $new_image = $image . "-new";
   my $old_image = $image . "-old";
-  my @dd_args = ("if=$device", "of=$tmp_image", "bs=1M", "count=$size");
+  my @dd_args = ("if=$device", "of=$new_image", "bs=1M", "count=$size");
   systemx( "/bin/dd", @dd_args );
 
   my @lo_down = ("-d", "$device");

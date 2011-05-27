@@ -179,8 +179,6 @@ sub resize_volume {
   my $image = "$self->{base}/$self->{imgs}/$customer";
   my $loop = $self->{loops}->{$customer};
 
-  print "We have $customer data in $image which is mounted on $loop\n";
-
   # Get fs type, unmount and find correct handler
 
   my $line;
@@ -214,10 +212,10 @@ sub resize_volume {
 
   if ( $new_size > $du ){
     # Grow
-    return $handler->grow( $image, $loop, $new_size, $mount );
+    $handler->grow( $image, $loop, $new_size, $mount );
   } elsif ( $new_size < $du ){
     # Shrink
-    return $handler->shrink( $image, $loop, $new_size, $mount );
+    $handler->shrink( $image, $loop, $new_size, $mount );
   } else {
     return 253;
   }
