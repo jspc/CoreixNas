@@ -9,6 +9,36 @@ use Poultry::Disk;
 
 my $disk = Poultry::Disk->new( "/data0", "images" );
 
-print $disk->create_volume( "CN1001", "ext4", "2048" );
+#print $disk->create_volume( "CN1001", "ext4", "2048" );
 
-$disk->delete_volume( "CN1001" );
+#$disk->delete_volume( "CN1001" );
+
+
+
+# Create some test volumes
+
+my %customers = (
+    CN1001  =>  5000,
+    CN1002  =>  2000,
+    CN1003  =>  1500,
+    CN1004  =>  12000,
+    CN1005  =>  8000
+    );
+
+
+foreach my $cn (keys %customers){
+    my $size = $customers{ $cn };
+    
+    print disk->create_volume( $cn, "ext3", $size );
+}
+
+
+
+# Resize some test volumes
+
+$disk->resize_volume( "CN1001", "2300" );
+$disk->resize_volume( "CN1005", "10000" );
+
+# Delete a volume
+
+$disk->delete_volume( "CN1002" );
