@@ -16,8 +16,15 @@ use warnings;
 
 package Poultry::Disk;
 
+use Poultry::Disk::Ext3;
+
+# For example....
+#use Poultry::Disk::Ext4;
+#use Poultry::Disk::XFS;
+
 use IPC::System::Simple qw(capturex systemx);
 use Storable;
+use Switch;
 
 sub new {
   # Constructor
@@ -27,15 +34,15 @@ sub new {
   my $imgs = shift;
 
   $self = bless {
-		 base => $base,
-		 imgs => $imgs,
-		 loop => "",
+		 base  =>  $base,
+		 imgs  =>  $imgs,
+		 loops =>  "",
 		};
 
-  $self->{loop} = $self->_get_loops();
+  $self->{loops} = $self->_get_loops();
+  $self->_start_devices();
 
   return $self;
-
 }
 
 sub errors {
@@ -43,6 +50,10 @@ sub errors {
   return {
 	  250 => "Cowardly refusing to overwrite image\n",
 	  251 => "The mountpoint exists, probably worth checking\n",
+	  252 => "Filesystem type not yet supported\n",
+	  253 => "You can't resize to exactly the same size\n",
+	  254 => "\n", # Undefined as of yet
+	  255 => "Filesystem too small for existing data\n",
 	 };
 }
 
@@ -117,18 +128,11 @@ sub create_volume {
   mkdir $mount;
 
   
-  # Add the image to fstab and update our list of loopback devices
-  # This means when we start the service we can keep the same devices
-  # Which will be perfect for fstab and so on
+  # Mount the device.
+  my @mount_args = ("-t", "$fs", "$device", "$mount");
+  systemx( "/bin/mount", @mount_args );
 
-  $self->_update_loops( $device, $image );
-  
-  open(FSTAB, ">>/etc/fstab");
-  print FSTAB "$device\t$mount\t$fs\tdefaults\t0\t0\n";
-  close FSTAB;
-
-  # Because this is in fstab we should be able to just do a straight mount
-  systemx( "/bin/mount", $device );
+  $self->_update_loops( $device, $customer );
 
   return 1;
   
@@ -146,7 +150,9 @@ sub delete_volume {
   # Suss out image and mountpoint
   my $mount = "$self->{base}\/$customer";
   my $image = "$self->{base}\/$self->{imgs}\/$customer";
-  my $loop = $self->{loop}->{image};
+  my $loop = $self->{loops}->{$customer};
+
+  $self->_remove_loops( $customer );
 
   my @umount_args = ( "-f", $loop );
   systemx( "/bin/umount", @umount_args );
@@ -157,19 +163,98 @@ sub delete_volume {
   unlink $image;
   rmdir $mount;
 
-  my @fstab_in;
-  my @fstab_out;
+}
+
+sub resize_volume {
+  # Resize a volume to add space. This stuff is handled by
+  # Modules in Poultry::Disk::*.pm
+  # Shares a lot of code with delete_volume() but I'm not sure it
+  # is appropriate to have a joint subroutine to do these bits
+
+  my $self = shift;
+  my $customer = shift;
+  my $new_size = shift;
+
+  my $mount = "$self->{base}/$customer";
+  my $image = "$self->{base}/$self->{imgs}/$customer";
+  my $loop = $self->{loops}->{$customer};
+
+  # Get fs type, unmount and find correct handler
+
+  my $line;
+
+  open(MTAB, "/etc/mtab");
+  foreach ( <MTAB> ){
+      if (  $_ =~ /$loop/ ){
+	  $line = $_;
+	  last;
+      }
+  }
+  close MTAB;
   
-  open ( FSTAB_i, "/etc/fstab" );
-  @fstab_in = <FSTAB_i>;
-  close FSTAB_i;
+  my @mtab_line = split ' ', $line;
+  my $fs = $mtab_line[2];
 
-  @fstab_out = grep !/^\$loop/, @fstab_in;
+  my $handler;
 
-  open ( FSTAB_o, "/etc/fstab_pretend" );
-  print FSTAB_o @fstab_out;
-  close FSTAB_o;
+  switch( $fs ) {
+    case "ext3" { $handler = Poultry::Disk::Ext3->new() }
+    else        { return 252 }
+  }
+  
+  # Compare current size so we know whether or not we're growing
+  # or Shrinking
 
+  my @du_args = ("-B", "1M", "$image");
+  my $du = capturex( "/usr/bin/du", @du_args );
+  my @du_res = split ' ', $du;
+  $du = $du_res[0];
+
+  if ( $new_size > $du ){
+    # Grow
+    $handler->grow( $image, $loop, $new_size, $mount );
+  } elsif ( $new_size < $du ){
+    # Shrink
+    $handler->shrink( $image, $loop, $new_size, $mount );
+  } else {
+    return 253;
+  }
+
+
+  # Remount the filesystem
+
+  my @mount_args = ("$loop", "$mount");
+  systemx( "/bin/mount", @mount_args );
+
+  return 1;
+
+}
+
+
+# INTERNAL SUBROUTINES
+
+sub _start_devices {
+  # Take everything in our loopback hashref
+  # Attach them to the right device and return
+
+  my $self = shift;
+  my $loops = $self->{loops};
+  
+  my ( @loop_args, @mount_args );
+
+  while ( my ($cust, $loop) = each %$loops ) {
+    # Attach the file to the loopback
+    # Mount the loopback
+
+    @loop_args = ("$loop", "$self->{base}/$self->{imgs}/$cust");
+    systemx( "losetup", @loop_args );
+
+    @mount_args = ("$loop", "$self->{base}/$cust");
+    systemx( "mount", @mount_args );
+    
+  }
+  
+  return 1;
 }
 
 
@@ -192,22 +277,41 @@ sub _get_loops {
 
 sub _update_loops {
   # Update the loopback device file
-  # &_update_loops /dev/loop0 /path/to/image
+  # &_update_loops /dev/loop0 CNxxxx
   # Saved as per $path => $loop for ease when
   # Updating and creating; where we'd need to umount
 
   my $self = shift;
   my $loop = shift;
-  my $path = shift;
+  my $cust = shift;
 
   my $loops = $self->{loops};
-  $loops->{$path} = $loop;
+  $loops->{$cust} = $loop;
 
   store $loops, "$self->{base}/internal/.loops";
   
   $self->{loops} = $self->_get_loops();
 
   return 1;
+}
+
+sub _remove_loops {
+    # Two subroutines; this one isn't called much so 
+    # No point bogging down _update_loops. Named as per
+    # This (for now) because I forgot I'd probably need this.
+    # D'oh
+
+    my $self = shift;
+    my $path = shift;
+
+    my $loops = $self->{loops};
+    delete $loops->{$path};
+
+    store $loops, "$self->{base}/internal/.loops";
+
+    $self->{loops} = $self->_get_loops();
+
+    return 1;
 }
 
 
