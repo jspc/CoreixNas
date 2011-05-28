@@ -15,6 +15,7 @@ package Poultry::Disk::Ext3;
 
 use IPC::System::Simple qw(capturex systemx);
 use File::Copy;
+use Poultry::Disk::Helper qw(current_size current_usage extend_image);
 
 sub new {
   # We're going to use our new subroutine to initialise paths
@@ -38,22 +39,14 @@ sub grow {
   my @umount_args = ( "-f", $device );
   systemx( "/bin/umount", @umount_args );
 
-  my @du_m_args = ("-B", "1M", "$image");
-  my $old_size = capturex( "/usr/bin/du", @du_m_args );
-  
-  my @old_size_arr = split ' ', $old_size;
-  my $skip_size = $old_size_arr[0] + 1;
-  $new_size = $new_size - $old_size_arr[0];
+  my $cur_size = current_size( $device, $image );
+  $new_size = $new_size - $cur_size;
 
-  my @dd_args = ("if=/dev/zero", "of=$image", "bs=1M", "count=$new_size", "seek=$skip_size");
-  systemx( "/bin/dd", @dd_args );
+  my $skip_size = $cur_size + 1;
+
+  $cur_size = extend_image( $image, $new_size, $skip_size );
 
   # Remove the Journaling, extend the filesystem and add it back
-
-  my @current_args = ("-B", "1M", "$image"); 
-  my $current_size = capturex( "du", @current_args );
-  my @current_size_arr = split ' ', $current_size;
-  $current_size = $current_size_arr[0];
 
   my @tune_e2 = ("-O", "^has_journal", "$device");
   systemx( "/sbin/tune2fs", @tune_e2 );
@@ -68,7 +61,7 @@ sub grow {
   systemx( "/sbin/e2fsck", @fsck_args );
 
   # Fix strange behaviour
-  my $resize = $current_size - 2;
+  my $resize = $cur_size - 2;
 
   my @resize_args = ("$device", $resize . "M");
   systemx( "/sbin/resize2fs", @resize_args );
@@ -94,11 +87,9 @@ sub shrink {
   # On the image, or we run the risk of data loss.
   # 10MB spare is reccommended for FS data and such
 
-  my @df_args = ("-B", "1M", "$device");
-  my $df = capturex( "/bin/df", @df_args );
-  my @df_arr = split ' ', $df;
 
-  my $used = $df_arr[9];
+  my $used = current_usage( $device );
+
 
   if ( ($used + 10) >= $new_size ){
     return 255;
