@@ -15,4 +15,4 @@ losetup -d /dev/loop7
 
 rm -rf /data0/CN*
 rm -rf /data0/images/*
-rm -rf /data/internal/.loops
+rm -rf /data0/internal/.loops

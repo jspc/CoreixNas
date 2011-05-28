@@ -25,7 +25,7 @@ my %customers = (
 
 foreach my $cn (keys %customers){
     my $size = $customers{ $cn };
-    print disk->create_volume( $cn, "ext3", $size );
+    print $disk->create_volume( $cn, "ext3", $size );
 }
 
 
