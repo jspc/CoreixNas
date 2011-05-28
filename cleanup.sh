@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-umount /dev/loop0
+umount /dev/loop*
 losetup -d /dev/loop0
 losetup -d /dev/loop1
 losetup -d /dev/loop2
