@@ -17,6 +17,7 @@ use warnings;
 package Poultry::Disk;
 
 use Poultry::Disk::Ext3;
+use Poultry::Disk::Ntfs;
 
 # For example....
 #use Poultry::Disk::Ext4;
@@ -198,7 +199,8 @@ sub resize_volume {
   my $handler;
 
   switch( $fs ) {
-    case "ext3" { $handler = Poultry::Disk::Ext3->new() }
+    case "ext3"     { $handler = Poultry::Disk::Ext3->new() }
+    case "ntfs-3g"  { $handler = Poultry::Disk::Ntfs->new() }
     else        { return 252 }
   }
   
