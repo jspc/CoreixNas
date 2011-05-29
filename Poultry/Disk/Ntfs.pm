@@ -20,7 +20,7 @@ sub new {
 }
 
 
-sub grow_fs {
+sub grow {
     # Extends the NTFS partition, called as per:
     # grow_fs( image_file, device, new_size, mountpoint )
     # mountpoint can be ignored if not needed.
@@ -50,7 +50,7 @@ sub grow_fs {
 
 
 
-sub shrink_fs {
+sub shrink {
     # Runs exactly the same as above but with extra checking
     # that we're, say, not wiping disk space
 
