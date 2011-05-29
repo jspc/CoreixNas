@@ -9,4 +9,4 @@ shrink_fs( image_file, device, new_size, mountpoint )
 We put the mountpoint last because for some filesystems it is worthless (ext3 testing uses this) and so
 a module may safely discard it.
 
-Others methods may be created as internals, but will never be called anywhere else
+Others methods may be created as internals, but will never be called anywhere else.
