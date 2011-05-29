@@ -16,7 +16,7 @@ use Poultry::Disk::Helper qw(current_size current_usage extend_image);
 use File::Copy;
 
 sub new {
-  return blesss {};
+  return bless {};
 }
 
 
