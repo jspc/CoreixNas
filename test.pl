@@ -18,14 +18,14 @@ my $disk = Poultry::Disk->new( "/data0", "images" );
 # Create some test volumes
 
 my %customers = (
-    CN1001  =>  5000,
-    CN1002  =>  2000,
-    );
+		 CN1001  =>  1000,
+		 CN1002  =>  4000,
+		);
 
 
 foreach my $cn (keys %customers){
     my $size = $customers{ $cn };
-    print $disk->create_volume( $cn, "ext3", $size );
+    print $disk->create_volume( $cn, "ntfs", $size );
 }
 
 
@@ -33,7 +33,7 @@ foreach my $cn (keys %customers){
 # Resize some test volumes
 
 $disk->resize_volume( "CN1001", "2300" );
-$disk->resize_volume( "CN1002", "5000" );
+$disk->resize_volume( "CN1002", "3000" );
 
 # Delete a volume
 

@@ -13,6 +13,7 @@ use warnings;
 package Poultry::Disk::Ntfs;
 
 use Poultry::Disk::Helper qw(current_size current_usage extend_image);
+use IPC::System::Simple qw(capturex systemx);
 use File::Copy;
 
 sub new {
@@ -35,12 +36,19 @@ sub grow {
 
     # Get the current size and extend
 
-    my $size = current_size( $device, $image );
-    my $additional_size = $size - $new_size;
+    my $size = current_size( $image );
+
+    my $additional_size = $new_size - $size;
     my $skip = $size + 1;
 
+    my @lo_down = ("-d", "$device");
+    systemx( "/sbin/losetup", @lo_down );
+
     extend_image( $image, $additional_size, $skip );
-    
+
+    my @lo_up = ("$device", "$image");
+    systemx( "/sbin/losetup", @lo_up );
+
     # Expand image
 
     $self->resize( $device, $new_size );
@@ -102,7 +110,9 @@ sub resize {
     my $device = shift;
     my $new_size = shift;
 
-    my @ntfs_args = ("$new_size" . "M", "$device");
+    $new_size = $new_size . "M";
+
+    my @ntfs_args = ( "-f", "-s", "$new_size", "$device");
     systemx( "ntfsresize", @ntfs_args );
 
     return 1;

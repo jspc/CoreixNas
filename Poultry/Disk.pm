@@ -118,7 +118,18 @@ sub create_volume {
   systemx( "/sbin/losetup", @lo_args );
   
 
-  my @fs_args = ("-t", "$fs", "$device");
+  my @fs_args;
+
+
+  # We have to hack for ntfs which is annoying
+  
+  if ( $fs eq "ntfs" ){
+    @fs_args = ("-t", "$fs", "-f", "$device");
+  } else {
+    @fs_args = ("-t", "$fs", "$device");
+  }
+
+
   systemx( "/sbin/mkfs", @fs_args );
 
 
@@ -198,10 +209,13 @@ sub resize_volume {
 
   my $handler;
 
+  
+  # ntfs-3g shows as a fuse fs because it is rubbish
+
   switch( $fs ) {
     case "ext3"     { $handler = Poultry::Disk::Ext3->new() }
-    case "ntfs-3g"  { $handler = Poultry::Disk::Ntfs->new() }
-    else        { return 252 }
+    case "fuseblk"  { $handler = Poultry::Disk::Ntfs->new() }
+    else            { return 252 }
   }
   
   # Compare current size so we know whether or not we're growing
@@ -211,6 +225,7 @@ sub resize_volume {
   my $du = capturex( "/usr/bin/du", @du_args );
   my @du_res = split ' ', $du;
   $du = $du_res[0];
+
 
   if ( $new_size > $du ){
     # Grow

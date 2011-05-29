@@ -26,13 +26,16 @@ B<Poultry::Disk::Helper> is the module which is called for the handlers in B<Pou
 
 =cut
 
-use Poultry::Disk::Helper
+package Poultry::Disk::Helper;
 
 use Exporter;
-use @ISA = qw(Exporter);
+our @ISA = qw(Exporter);
 our $version = "1.00";
 
-our @EXPORT = qw(current_size current_usage extend_image);
+our @EXPORT = qw(current_size current_usage current_fs_size extend_image);
+
+
+use IPC::System::Simple qw(capturex systemx);
 
 
 sub current_size {
@@ -42,18 +45,18 @@ sub current_size {
 
     my @du_m_args = ("-B", "1M", "$image");
     my $old_size = capturex( "/usr/bin/du", @du_m_args );
-  
+
     my @old_size_arr = split ' ', $old_size;
-    
+
     return $old_size_arr[0];
 }
 
 
 sub current_usage {
     # Get the current usage of the filesystem
-    
+
     my $device = shift;
-	
+
     my @df_args = ("-B", "1M", "$device");
     my $df = capturex( "/bin/df", @df_args );
     my @df_arr = split ' ', $df;
@@ -61,6 +64,19 @@ sub current_usage {
     return $df_arr[9];
 
 }
+
+
+sub current_fs_size {
+    # Useful for when we're shrinking
+
+    my $device = shift;
+
+    my @df_args = ("-B", "1M", "$device");
+    my $df = capturex( "/bin/df", @df_args );
+    my @df_arr = split ' ', $df;
+
+    return $df_arr[8];
+  }
 
 
 sub extend_image {
@@ -72,7 +88,7 @@ sub extend_image {
 
     my @dd_args = ("if=/dev/zero", "of=$image", "bs=1M", "count=$additional", "seek=$skip");
     systemx( "/bin/dd", @dd_args );
-    
+
     return current_size( $image );
 
 }
@@ -81,6 +97,8 @@ sub extend_image {
 jspc - James Condron
 E<lt>j.condron@coreix.netE<gt>
 L<http://zero-internet.org.uk>
+
+
 =cut
 
 
