@@ -15,7 +15,7 @@ package Poultry::Disk::Ext3;
 
 use IPC::System::Simple qw(capturex systemx);
 use File::Copy;
-use Poultry::Disk::Helper qw(current_size current_usage extend_image);
+use Poultry::Disk::Helper qw(current_size current_usage current_fs_size extend_image);
 
 sub new {
   # We're going to use our new subroutine to initialise paths
@@ -44,12 +44,17 @@ sub grow {
 
   my $skip_size = $cur_size + 1;
 
-  $cur_size = extend_image( $image, $new_size, $skip_size );
+  #$cur_size = extend_image( $image, $new_size, $skip_size );
 
   # Remove the Journaling, extend the filesystem and add it back
 
-  my @tune_e2 = ("-O", "^has_journal", "$device");
+  my @tune_e2 = ("-O", "\^has_journal", "$device");
   systemx( "/sbin/tune2fs", @tune_e2 );
+
+  my @fsck_args = ("-f", "$device");
+  systemx( "/sbin/e2fsck", @fsck_args );
+
+  $cur_size = extend_image( $image, $new_size, $skip_size );
 
   my @lo_down = ("-d", "$device");
   systemx( "/sbin/losetup", @lo_down );
@@ -57,8 +62,6 @@ sub grow {
   my @lo_up = ("$device", "$image");
   systemx( "/sbin/losetup", @lo_up );
 
-  my @fsck_args = ("-f", "$device");
-  systemx( "/sbin/e2fsck", @fsck_args );
 
   # Fix strange behaviour
   my $resize = $cur_size - 2;
@@ -115,10 +118,7 @@ sub shrink {
 
   # Get the right size of the FS for the resizing
 
-  $df = capturex( "/bin/df", @df_args );
-
-  @df_arr = split ' ', $df;
-  my $size = $df_arr[8];
+  my $size = current_fs_size( $device );
   $size = $size + 1;         # Paranoia
 
   systemx( "/bin/umount", @umount_args );
