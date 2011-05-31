@@ -1,0 +1,7 @@
+Millet
+James Condron 2011
+
+Millet is our distribution to handle user-y stuff.
+
+We'll create users, remove users, do passwords and other cool stuff
+We'll handle the jailing/ scponly stuff too while we're at it
