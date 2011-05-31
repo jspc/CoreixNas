@@ -65,4 +65,12 @@ sub del_smb {
 }
 
 
+sub reload {
+    # We're going to want to reload config files
+    # After we've added/ removed an export
+
+
+}
+
+
 1;
