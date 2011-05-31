@@ -29,6 +29,22 @@ sub new {
 sub add_nfs {
     # Add a directory as an NFS share
 
+    my $self = shift;
+    my $directory = shift;
+    my $ip = shift;
+    
+    # A note...
+    # nfs is a little... crap. You either map U/GIDs and hope they're identical across the board
+    # Or you use root squashing/ assume all connections are root. Of course they will be, but this
+    # presents a problem- you'd have to give eveybody access to everything else.
+    #
+    # SMB, SCP and FTP wont have this problem, but NFS will
+
+    open EXP, "<<$self->{nfs}";
+    print EXP "$directory\t$ip(rw,no_root_squash)";
+
+    return 1;
+
 }
 
 
