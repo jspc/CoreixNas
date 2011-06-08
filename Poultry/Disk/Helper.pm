@@ -12,6 +12,7 @@
 Poultry::Disk::Helper - Make resizing images a tad simpler in Poultry::Disk::<fs> handlers
 
 =head1 SYNOPSIS
+
     use Poultry::Disk::Helper qw(current_size current_usage extend_image);
 
     my $size = current_size( "/path/to/image" );
