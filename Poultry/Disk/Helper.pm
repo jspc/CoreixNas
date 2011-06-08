@@ -95,6 +95,7 @@ sub extend_image {
 }
 
 =head1 AUTHOR
+
 jspc - James Condron
 E<lt>j.condron@coreix.netE<gt>
 L<http://zero-internet.org.uk>
