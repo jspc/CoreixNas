@@ -40,7 +40,7 @@ sub add_nfs {
   #
   # SMB, SCP and FTP wont have this problem, but NFS will
 
-  open EXP, "<<$self->{nfs}";
+  open EXP, ">>$self->{nfs}";
   print EXP "$directory\t$ip(rw,no_root_squash)\n\n";
   close EXP;
   
@@ -58,7 +58,7 @@ sub add_smb {
   my $directory = shift;
   my $user = shift;
   
-  open EXP, "<<$self->{smb}";
+  open EXP, ">>$self->{smb}";
   print EXP "#BEGIN $user\n";
   print EXP "[$user]\n";
   print EXP "path=$directory\n";
